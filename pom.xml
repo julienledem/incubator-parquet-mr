@@ -57,6 +57,40 @@
     </developer>
   </developers>
 
+  <repositories>
+    <repository>
+      <id>dremio-releases</id>
+      <name>Dremio Internal</name>
+      <url>http://repository.drem.io/content/groups/java-mirror/</url>
+      <releases>
+        <enabled>true</enabled>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+      </snapshots>
+    </repository>
+  </repositories>
+
+  <!-- this is needed for maven-thrift-plugin, would like to remove this.
+   see: https://issues.apache.org/jira/browse/THRIFT-1536  -->
+  <pluginRepositories>
+    <pluginRepository>
+      <id>Twitter public Maven repo</id>
+      <url>http://maven.twttr.com</url>
+    </pluginRepository>
+    <pluginRepository>
+      <id>dremio-internal</id>
+      <name>Dremio Internal</name>
+      <url>http://repository.drem.io/content/groups/java-mirror/</url>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+      <releases>
+        <updatePolicy>never</updatePolicy>
+      </releases>
+    </pluginRepository>
+  </pluginRepositories>
+
   <properties>
     <targetJavaVersion>1.7</targetJavaVersion>
     <maven.compiler.source>1.7</maven.compiler.source>
@@ -73,7 +107,8 @@
     <hadoop1.version>1.1.0</hadoop1.version>
     <cascading.version>2.5.3</cascading.version>
     <cascading3.version>3.0.3</cascading3.version>
-    <parquet.format.version>2.3.1</parquet.format.version>
+    <parquet.format.version>2.3.0-incubating-201701192040120487-851e12d</parquet.format.version>
+    <log4j.version>1.2.17</log4j.version>
     <previous.version>1.7.0</previous.version>
     <thrift.executable>thrift</thrift.executable>
     <scala.version>2.10.4</scala.version>
