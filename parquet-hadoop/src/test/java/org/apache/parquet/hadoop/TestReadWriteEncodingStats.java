@@ -19,6 +19,17 @@
 
 package org.apache.parquet.hadoop;
 
+import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_1_0;
+import static org.apache.parquet.schema.MessageTypeParser.parseMessageType;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertTrue;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.UUID;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 import org.apache.parquet.column.EncodingStats;
@@ -31,17 +42,6 @@ import org.apache.parquet.schema.MessageType;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-
-import java.io.File;
-import java.io.IOException;
-import java.util.UUID;
-
-import static org.apache.parquet.column.ParquetProperties.WriterVersion.PARQUET_1_0;
-import static org.apache.parquet.schema.MessageTypeParser.parseMessageType;
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertTrue;
 
 /**
  * Tests that files are written with EncodingStats, the stats are readable, and generally correct.
@@ -114,8 +114,8 @@ public class TestReadWriteEncodingStats {
     ColumnChunkMetaData fallbackColumn = rowGroup.getColumns().get(2);
     EncodingStats fallbackStats = fallbackColumn.getEncodingStats();
     assertNotNull("Fallback column should have non-null encoding stats", fallbackStats);
-    assertTrue("Fallback column should have a dict page", fallbackStats.hasDictionaryPages());
-    assertTrue("Fallback column should have dict-encoded pages", fallbackStats.hasDictionaryEncodedPages());
+    assertFalse("Fallback column should not have a dict page (since we remove dictionary encoded pages when falling back)", fallbackStats.hasDictionaryPages());
+    assertFalse("Fallback column should not have dict-encoded pages (since we remove dictionary encoded pages when falling back)", fallbackStats.hasDictionaryEncodedPages());
     assertTrue("Fallback column should have non-dict pages", fallbackStats.hasNonDictionaryEncodedPages());
   }
 }

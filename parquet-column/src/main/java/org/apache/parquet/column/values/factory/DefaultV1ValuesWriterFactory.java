@@ -18,15 +18,17 @@
  */
 package org.apache.parquet.column.values.factory;
 
+import static org.apache.parquet.column.Encoding.PLAIN_DICTIONARY;
+import static org.apache.parquet.column.values.factory.DefaultValuesWriterFactory.dictionaryWriter;
+
 import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.column.Encoding;
 import org.apache.parquet.column.ParquetProperties;
 import org.apache.parquet.column.values.ValuesWriter;
+import org.apache.parquet.column.values.dictionary.DictionaryValuesWriter;
 import org.apache.parquet.column.values.plain.BooleanPlainValuesWriter;
 import org.apache.parquet.column.values.plain.FixedLenByteArrayPlainValuesWriter;
 import org.apache.parquet.column.values.plain.PlainValuesWriter;
-
-import static org.apache.parquet.column.Encoding.PLAIN_DICTIONARY;
 
 public class DefaultV1ValuesWriterFactory implements ValuesWriterFactory {
 
@@ -76,7 +78,7 @@ public class DefaultV1ValuesWriterFactory implements ValuesWriterFactory {
 
   private ValuesWriter getFixedLenByteArrayValuesWriter(ColumnDescriptor path) {
     // dictionary encoding was not enabled in PARQUET 1.0
-    return new FixedLenByteArrayPlainValuesWriter(path.getTypeLength(), parquetProperties.getInitialSlabSize(), parquetProperties.getPageSizeThreshold(), parquetProperties.getAllocator());
+    return getFBFixedLenByteArrayValuesWriter(path);
   }
 
   private ValuesWriter getBinaryValuesWriter(ColumnDescriptor path) {
@@ -108,4 +110,63 @@ public class DefaultV1ValuesWriterFactory implements ValuesWriterFactory {
     ValuesWriter fallbackWriter = new PlainValuesWriter(parquetProperties.getInitialSlabSize(), parquetProperties.getPageSizeThreshold(), parquetProperties.getAllocator());
     return DefaultValuesWriterFactory.dictWriterWithFallBack(path, parquetProperties, getEncodingForDictionaryPage(), getEncodingForDataPage(), fallbackWriter);
   }
+
+  private ValuesWriter getFBFixedLenByteArrayValuesWriter(ColumnDescriptor path) {
+    // dictionary encoding was not enabled in PARQUET 1.0
+    return new FixedLenByteArrayPlainValuesWriter(path.getTypeLength(), parquetProperties.getInitialSlabSize(), parquetProperties.getPageSizeThreshold(), parquetProperties.getAllocator());
+  }
+
+  private ValuesWriter getFBBinaryValuesWriter(ColumnDescriptor path) {
+    return new PlainValuesWriter(parquetProperties.getInitialSlabSize(), parquetProperties.getPageSizeThreshold(), parquetProperties.getAllocator());
+  }
+
+  private ValuesWriter getFBInt32ValuesWriter(ColumnDescriptor path) {
+    return new PlainValuesWriter(parquetProperties.getInitialSlabSize(), parquetProperties.getPageSizeThreshold(), parquetProperties.getAllocator());
+  }
+
+  private ValuesWriter getFBInt64ValuesWriter(ColumnDescriptor path) {
+    return new PlainValuesWriter(parquetProperties.getInitialSlabSize(), parquetProperties.getPageSizeThreshold(), parquetProperties.getAllocator());
+  }
+
+  private ValuesWriter getFBInt96ValuesWriter(ColumnDescriptor path) {
+    return new FixedLenByteArrayPlainValuesWriter(12, parquetProperties.getInitialSlabSize(), parquetProperties.getPageSizeThreshold(), parquetProperties.getAllocator());
+  }
+
+  private ValuesWriter getFBDoubleValuesWriter(ColumnDescriptor path) {
+    return new PlainValuesWriter(parquetProperties.getInitialSlabSize(), parquetProperties.getPageSizeThreshold(), parquetProperties.getAllocator());
+  }
+
+  private ValuesWriter getFBFloatValuesWriter(ColumnDescriptor path) {
+    return new PlainValuesWriter(parquetProperties.getInitialSlabSize(), parquetProperties.getPageSizeThreshold(), parquetProperties.getAllocator());
+  }
+
+  @Override
+  public ValuesWriter newFallbackValuesWriter(ColumnDescriptor descriptor) {
+    switch (descriptor.getType()) {
+    case BOOLEAN:
+      return getBooleanValuesWriter();
+    case FIXED_LEN_BYTE_ARRAY:
+      return getFBFixedLenByteArrayValuesWriter(descriptor);
+    case BINARY:
+      return getFBBinaryValuesWriter(descriptor);
+    case INT32:
+      return getFBInt32ValuesWriter(descriptor);
+    case INT64:
+      return getFBInt64ValuesWriter(descriptor);
+    case INT96:
+      return getFBInt96ValuesWriter(descriptor);
+    case DOUBLE:
+      return getFBDoubleValuesWriter(descriptor);
+    case FLOAT:
+      return getFBFloatValuesWriter(descriptor);
+    default:
+      throw new IllegalArgumentException("Unknown type " + descriptor.getType());
+    }
+  }
+
+  @Override
+  public DictionaryValuesWriter newDictionaryWriter(ColumnDescriptor path) {
+    return dictionaryWriter(path, parquetProperties, getEncodingForDictionaryPage(), getEncodingForDataPage());
+  }
+
 }

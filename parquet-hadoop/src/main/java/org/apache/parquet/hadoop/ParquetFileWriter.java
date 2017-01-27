@@ -1,4 +1,4 @@
-/* 
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -40,7 +41,6 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FSDataOutputStream;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
-
 import org.apache.parquet.Log;
 import org.apache.parquet.Preconditions;
 import org.apache.parquet.Strings;
@@ -52,18 +52,19 @@ import org.apache.parquet.column.Encoding;
 import org.apache.parquet.column.EncodingStats;
 import org.apache.parquet.column.page.DictionaryPage;
 import org.apache.parquet.column.statistics.Statistics;
-import org.apache.parquet.hadoop.ParquetOutputFormat.JobSummaryLevel;
-import org.apache.parquet.hadoop.metadata.ColumnPath;
+import org.apache.parquet.format.PageHeader;
 import org.apache.parquet.format.converter.ParquetMetadataConverter;
+import org.apache.parquet.hadoop.ParquetOutputFormat.JobSummaryLevel;
 import org.apache.parquet.hadoop.metadata.BlockMetaData;
 import org.apache.parquet.hadoop.metadata.ColumnChunkMetaData;
+import org.apache.parquet.hadoop.metadata.ColumnPath;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.apache.parquet.hadoop.metadata.FileMetaData;
 import org.apache.parquet.hadoop.metadata.GlobalMetaData;
 import org.apache.parquet.hadoop.metadata.ParquetMetadata;
 import org.apache.parquet.hadoop.util.HadoopStreams;
-import org.apache.parquet.io.SeekableInputStream;
 import org.apache.parquet.io.ParquetEncodingException;
+import org.apache.parquet.io.SeekableInputStream;
 import org.apache.parquet.schema.MessageType;
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
 import org.apache.parquet.schema.TypeUtil;
@@ -113,6 +114,7 @@ public class ParquetFileWriter {
 
   // file data
   private List<BlockMetaData> blocks = new ArrayList<BlockMetaData>();
+  private final List<PageHeaderWithOffset> currentPageHeaders = new ArrayList<PageHeaderWithOffset>();
 
   // row group data
   private BlockMetaData currentBlock; // appended to by endColumn
@@ -126,6 +128,7 @@ public class ParquetFileWriter {
   private long uncompressedLength;
   private long compressedLength;
   private Statistics currentStatistics; // accumulated in writePage(s)
+  private final boolean addPageHeadersToMetadata;
 
   // column chunk data set at the start of a column
   private CompressionCodecName currentChunkCodec; // set in startColumn
@@ -197,7 +200,7 @@ public class ParquetFileWriter {
   public ParquetFileWriter(Configuration configuration, MessageType schema,
       Path file) throws IOException {
     this(configuration, schema, file, Mode.CREATE, DEFAULT_BLOCK_SIZE,
-        MAX_PADDING_SIZE_DEFAULT);
+        MAX_PADDING_SIZE_DEFAULT, false);
   }
 
   /**
@@ -210,7 +213,7 @@ public class ParquetFileWriter {
   public ParquetFileWriter(Configuration configuration, MessageType schema,
                            Path file, Mode mode) throws IOException {
     this(configuration, schema, file, mode, DEFAULT_BLOCK_SIZE,
-        MAX_PADDING_SIZE_DEFAULT);
+        MAX_PADDING_SIZE_DEFAULT, false);
   }
 
   /**
@@ -223,10 +226,11 @@ public class ParquetFileWriter {
    */
   public ParquetFileWriter(Configuration configuration, MessageType schema,
                            Path file, Mode mode, long rowGroupSize,
-                           int maxPaddingSize)
+                           int maxPaddingSize, boolean addPageHeadersToMetadata)
       throws IOException {
     TypeUtil.checkValidWriteSchema(schema);
     this.schema = schema;
+    this.addPageHeadersToMetadata = addPageHeadersToMetadata;
     FileSystem fs = file.getFileSystem(configuration);
     boolean overwriteFlag = (mode == Mode.OVERWRITE);
 
@@ -261,6 +265,7 @@ public class ParquetFileWriter {
       throws IOException {
     FileSystem fs = file.getFileSystem(configuration);
     this.schema = schema;
+    this.addPageHeadersToMetadata = false;
     this.alignment = PaddingAlignment.get(
         rowAndBlockSize, rowAndBlockSize, maxPaddingSize);
     this.out = fs.create(file, true, DFS_BUFFER_SIZE_DEFAULT,
@@ -317,31 +322,35 @@ public class ParquetFileWriter {
     // need to know what type of stats to initialize to
     // better way to do this?
     currentStatistics = Statistics.getStatsBasedOnType(currentChunkType);
+    currentPageHeaders.clear();
   }
 
   /**
    * writes a dictionary page page
    * @param dictionaryPage the dictionary page
    */
-  public void writeDictionaryPage(DictionaryPage dictionaryPage) throws IOException {
+  public void writeDictionaryPage(DictionaryPage dictionaryPage, boolean sorted) throws IOException {
     state = state.write();
     if (DEBUG) LOG.debug(out.getPos() + ": write dictionary page: " + dictionaryPage.getDictionarySize() + " values");
     currentChunkDictionaryPageOffset = out.getPos();
     int uncompressedSize = dictionaryPage.getUncompressedSize();
     int compressedPageSize = (int)dictionaryPage.getBytes().size(); // TODO: fix casts
-    metadataConverter.writeDictionaryPageHeader(
+    final PageHeader pageHeader = metadataConverter.writeDictionaryPageHeader(
         uncompressedSize,
         compressedPageSize,
         dictionaryPage.getDictionarySize(),
         dictionaryPage.getEncoding(),
+        sorted,
         out);
-    long headerSize = out.getPos() - currentChunkDictionaryPageOffset;
+    long currentPos = out.getPos();
+    long headerSize = currentPos - currentChunkDictionaryPageOffset;
     this.uncompressedLength += uncompressedSize + headerSize;
     this.compressedLength += compressedPageSize + headerSize;
     if (DEBUG) LOG.debug(out.getPos() + ": write dictionary page content " + compressedPageSize);
     dictionaryPage.getBytes().writeAllTo(out);
     encodingStatsBuilder.addDictEncoding(dictionaryPage.getEncoding());
     currentEncodings.add(dictionaryPage.getEncoding());
+    currentPageHeaders.add(new PageHeaderWithOffset(pageHeader, currentPos));
   }
 
 
@@ -365,14 +374,15 @@ public class ParquetFileWriter {
     long beforeHeader = out.getPos();
     if (DEBUG) LOG.debug(beforeHeader + ": write data page: " + valueCount + " values");
     int compressedPageSize = (int)bytes.size();
-    metadataConverter.writeDataPageHeader(
+    final PageHeader pageHeader = metadataConverter.writeDataPageHeader(
         uncompressedPageSize, compressedPageSize,
         valueCount,
         rlEncoding,
         dlEncoding,
         valuesEncoding,
         out);
-    long headerSize = out.getPos() - beforeHeader;
+    long currentPos = out.getPos();
+    long headerSize = currentPos - beforeHeader;
     this.uncompressedLength += uncompressedPageSize + headerSize;
     this.compressedLength += compressedPageSize + headerSize;
     if (DEBUG) LOG.debug(out.getPos() + ": write data page content " + compressedPageSize);
@@ -381,6 +391,7 @@ public class ParquetFileWriter {
     currentEncodings.add(rlEncoding);
     currentEncodings.add(dlEncoding);
     currentEncodings.add(valuesEncoding);
+    currentPageHeaders.add(new PageHeaderWithOffset(pageHeader, currentPos));
   }
 
   /**
@@ -403,7 +414,7 @@ public class ParquetFileWriter {
     long beforeHeader = out.getPos();
     if (DEBUG) LOG.debug(beforeHeader + ": write data page: " + valueCount + " values");
     int compressedPageSize = (int)bytes.size();
-    metadataConverter.writeDataPageHeader(
+    final PageHeader pageHeader = metadataConverter.writeDataPageHeader(
         uncompressedPageSize, compressedPageSize,
         valueCount,
         statistics,
@@ -411,7 +422,8 @@ public class ParquetFileWriter {
         dlEncoding,
         valuesEncoding,
         out);
-    long headerSize = out.getPos() - beforeHeader;
+    long currentPos = out.getPos();
+    long headerSize = currentPos - beforeHeader;
     this.uncompressedLength += uncompressedPageSize + headerSize;
     this.compressedLength += compressedPageSize + headerSize;
     if (DEBUG) LOG.debug(out.getPos() + ": write data page content " + compressedPageSize);
@@ -421,6 +433,7 @@ public class ParquetFileWriter {
     currentEncodings.add(rlEncoding);
     currentEncodings.add(dlEncoding);
     currentEncodings.add(valuesEncoding);
+    currentPageHeaders.add(new PageHeaderWithOffset(pageHeader, currentPos));
   }
 
   /**
@@ -436,7 +449,8 @@ public class ParquetFileWriter {
                       Statistics totalStats,
                       Set<Encoding> rlEncodings,
                       Set<Encoding> dlEncodings,
-                      List<Encoding> dataEncodings) throws IOException {
+                      List<Encoding> dataEncodings,
+                      List<PageHeaderWithOffset> pageHeaders) throws IOException {
     state = state.write();
     if (DEBUG) LOG.debug(out.getPos() + ": write data pages");
     long headersSize = bytes.size() - compressedTotalPageSize;
@@ -452,6 +466,9 @@ public class ParquetFileWriter {
     currentEncodings.addAll(dlEncodings);
     currentEncodings.addAll(dataEncodings);
     currentStatistics = totalStats;
+    if (pageHeaders != null) {
+      this.currentPageHeaders.addAll(pageHeaders);
+    }
   }
 
   /**
@@ -472,10 +489,12 @@ public class ParquetFileWriter {
         currentChunkDictionaryPageOffset,
         currentChunkValueCount,
         compressedLength,
-        uncompressedLength));
+        uncompressedLength,
+        addPageHeadersToMetadata? currentPageHeaders : Collections.<PageHeaderWithOffset>emptyList()));
     this.currentBlock.setTotalByteSize(currentBlock.getTotalByteSize() + uncompressedLength);
     this.uncompressedLength = 0;
     this.compressedLength = 0;
+    this.currentPageHeaders.clear();
   }
 
   /**
@@ -581,7 +600,8 @@ public class ParquetFileWriter {
           newChunkStart,
           chunk.getValueCount(),
           chunk.getTotalSize(),
-          chunk.getTotalUncompressedSize()));
+          chunk.getTotalUncompressedSize(),
+          addPageHeadersToMetadata? currentPageHeaders : Collections.<PageHeaderWithOffset>emptyList()));
 
       blockCompressedSize += chunk.getTotalSize();
     }

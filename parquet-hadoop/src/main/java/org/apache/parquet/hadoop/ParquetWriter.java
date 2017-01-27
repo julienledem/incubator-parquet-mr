@@ -1,4 +1,4 @@
-/* 
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -23,7 +23,6 @@ import java.io.IOException;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
-
 import org.apache.parquet.column.ParquetProperties;
 import org.apache.parquet.column.ParquetProperties.WriterVersion;
 import org.apache.parquet.hadoop.api.WriteSupport;
@@ -36,12 +35,12 @@ import org.apache.parquet.schema.MessageType;
 public class ParquetWriter<T> implements Closeable {
 
   public static final int DEFAULT_BLOCK_SIZE = 128 * 1024 * 1024;
-  public static final int DEFAULT_PAGE_SIZE =
-      ParquetProperties.DEFAULT_PAGE_SIZE;
+  public static final int DEFAULT_PAGE_SIZE = ParquetProperties.DEFAULT_PAGE_SIZE;
   public static final CompressionCodecName DEFAULT_COMPRESSION_CODEC_NAME =
       CompressionCodecName.UNCOMPRESSED;
   public static final boolean DEFAULT_IS_DICTIONARY_ENABLED =
       ParquetProperties.DEFAULT_IS_DICTIONARY_ENABLED;
+  public static final boolean DEFAULT_ADD_PAGE_HEADERS_TO_FOOTER = false;
   public static final boolean DEFAULT_IS_VALIDATING_ENABLED = false;
   public static final WriterVersion DEFAULT_WRITER_VERSION =
       ParquetProperties.DEFAULT_WRITER_VERSION;
@@ -271,7 +270,7 @@ public class ParquetWriter<T> implements Closeable {
     MessageType schema = writeContext.getSchema();
 
     ParquetFileWriter fileWriter = new ParquetFileWriter(
-        conf, schema, file, mode, blockSize, maxPaddingSize);
+        conf, schema, file, mode, blockSize, maxPaddingSize, encodingProps.shouldAddPageHeadersToMetadata());
     fileWriter.start();
 
     this.codecFactory = new CodecFactory(conf, encodingProps.getPageSizeThreshold());
@@ -481,6 +480,18 @@ public class ParquetWriter<T> implements Closeable {
      */
     public SELF withWriterVersion(WriterVersion version) {
       encodingPropsBuilder.withWriterVersion(version);
+      return self();
+    }
+
+    /**
+     * Set the Parquet format dictionary page size used by the constructed
+     * writer.
+     *
+     * @param addPageHeadersToMetadata whether page headers should be added to footer.
+     * @return this builder for method chaining.
+     */
+    public SELF withAddPageHeadersToFooter(boolean addPageHeadersToMetadata) {
+      encodingPropsBuilder.addPageHeadersToMetadata(addPageHeadersToMetadata);
       return self();
     }
 

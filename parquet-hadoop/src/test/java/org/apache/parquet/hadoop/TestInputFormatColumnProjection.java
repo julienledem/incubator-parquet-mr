@@ -18,6 +18,15 @@
  */
 package org.apache.parquet.hadoop;
 
+import static java.lang.Thread.sleep;
+import static org.apache.parquet.schema.OriginalType.UTF8;
+import static org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.BINARY;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.util.UUID;
+
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
@@ -42,14 +51,6 @@ import org.junit.Assume;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.util.UUID;
-
-import static java.lang.Thread.sleep;
-import static org.apache.parquet.schema.OriginalType.UTF8;
-import static org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName.BINARY;
 
 public class TestInputFormatColumnProjection {
   public static final String FILE_CONTENT = "" +
@@ -164,8 +165,8 @@ public class TestInputFormatColumnProjection {
       bytesRead = Reader.bytesReadCounter.getValue();
     }
 
-    Assert.assertTrue("Should read less than 10% of the input file size",
-        bytesRead < (bytesWritten / 10));
+    Assert.assertTrue("Should read less than 20% of the input file size but read " + bytesRead + " out of " + bytesWritten,
+        bytesRead < (bytesWritten * 20 / 100));
   }
 
   private void waitForJob(Job job) throws Exception {

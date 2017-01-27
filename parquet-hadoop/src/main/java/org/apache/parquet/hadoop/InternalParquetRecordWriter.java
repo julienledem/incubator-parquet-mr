@@ -97,8 +97,10 @@ class InternalParquetRecordWriter<T> {
   }
 
   private void initStore() {
-    pageStore = new ColumnChunkPageWriteStore(compressor, schema, props.getAllocator());
-    columnStore = props.newColumnWriteStore(schema, pageStore);
+    pageStore = new ColumnChunkPageWriteStore(compressor, schema, props);
+    columnStore = props.newColumnWriteStore(
+        schema,
+        pageStore);
     MessageColumnIO columnIO = new ColumnIOFactory(validating).getColumnIO(schema);
     this.recordConsumer = columnIO.getRecordWriter(columnStore);
     writeSupport.prepareForWrite(recordConsumer);
@@ -161,13 +163,15 @@ class InternalParquetRecordWriter<T> {
     recordConsumer.flush();
     LOG.info(format("Flushing mem columnStore to file. allocated memory: %,d", columnStore.getAllocatedSize()));
     if (columnStore.getAllocatedSize() > (3 * rowGroupSizeThreshold)) {
-      LOG.warn("Too much memory used: " + columnStore.memUsageString());
+      LOG.warn(format("Too much memory used: %d, threshold %d usage: %s",
+        columnStore.getAllocatedSize(), 3 *rowGroupSizeThreshold, columnStore.memUsageString()));
     }
 
     if (recordCount > 0) {
       parquetFileWriter.startBlock(recordCount);
       columnStore.flush();
       pageStore.flushToFileWriter(parquetFileWriter);
+
       recordCount = 0;
       parquetFileWriter.endBlock();
       this.nextRowGroupSize = Math.min(

@@ -23,6 +23,8 @@ import java.util.List;
 import java.util.Locale;
 
 import org.apache.parquet.column.ColumnReader;
+import org.apache.parquet.column.values.ValuesReader;
+import org.apache.parquet.column.values.ValuesWriter;
 import org.apache.parquet.io.InvalidRecordException;
 import org.apache.parquet.io.api.Binary;
 import org.apache.parquet.io.api.PrimitiveConverter;
@@ -86,6 +88,11 @@ public final class PrimitiveType extends Type {
       public <T, E extends Exception> T convert(PrimitiveTypeNameConverter<T, E> converter) throws E {
         return converter.convertINT64(this);
       }
+
+      @Override
+      public void copyFrom(ValuesReader from, ValuesWriter to) {
+        to.writeLong(from.readLong());
+      }
     },
     INT32("getInteger", Integer.TYPE) {
       @Override
@@ -108,6 +115,11 @@ public final class PrimitiveType extends Type {
       @Override
       public <T, E extends Exception> T convert(PrimitiveTypeNameConverter<T, E> converter) throws E {
         return converter.convertINT32(this);
+      }
+
+      @Override
+      public void copyFrom(ValuesReader from, ValuesWriter to) {
+        to.writeInteger(from.readInteger());
       }
     },
     BOOLEAN("getBoolean", Boolean.TYPE) {
@@ -132,6 +144,11 @@ public final class PrimitiveType extends Type {
       public <T, E extends Exception> T convert(PrimitiveTypeNameConverter<T, E> converter) throws E {
         return converter.convertBOOLEAN(this);
       }
+
+      @Override
+      public void copyFrom(ValuesReader from, ValuesWriter to) {
+        to.writeBoolean(from.readBoolean());
+      }
     },
     BINARY("getBinary", Binary.class) {
       @Override
@@ -154,6 +171,11 @@ public final class PrimitiveType extends Type {
       @Override
       public <T, E extends Exception> T convert(PrimitiveTypeNameConverter<T, E> converter) throws E {
         return converter.convertBINARY(this);
+      }
+
+      @Override
+      public void copyFrom(ValuesReader from, ValuesWriter to) {
+        to.writeBytes(from.readBytes());
       }
     },
     FLOAT("getFloat", Float.TYPE) {
@@ -178,6 +200,11 @@ public final class PrimitiveType extends Type {
       public <T, E extends Exception> T convert(PrimitiveTypeNameConverter<T, E> converter) throws E {
         return converter.convertFLOAT(this);
       }
+
+      @Override
+      public void copyFrom(ValuesReader from, ValuesWriter to) {
+        to.writeFloat(from.readFloat());
+      }
     },
     DOUBLE("getDouble", Double.TYPE) {
       @Override
@@ -201,6 +228,11 @@ public final class PrimitiveType extends Type {
       public <T, E extends Exception> T convert(PrimitiveTypeNameConverter<T, E> converter) throws E {
         return converter.convertDOUBLE(this);
       }
+
+      @Override
+      public void copyFrom(ValuesReader from, ValuesWriter to) {
+        to.writeDouble(from.readDouble());
+      }
     },
     INT96("getBinary", Binary.class) {
       @Override
@@ -221,6 +253,11 @@ public final class PrimitiveType extends Type {
       @Override
       public <T, E extends Exception> T convert(PrimitiveTypeNameConverter<T, E> converter) throws E {
         return converter.convertINT96(this);
+      }
+
+      @Override
+      public void copyFrom(ValuesReader from, ValuesWriter to) {
+        to.writeBytes(from.readBytes());
       }
     },
     FIXED_LEN_BYTE_ARRAY("getBinary", Binary.class) {
@@ -244,6 +281,11 @@ public final class PrimitiveType extends Type {
       @Override
       public <T, E extends Exception> T convert(PrimitiveTypeNameConverter<T, E> converter) throws E {
         return converter.convertFIXED_LEN_BYTE_ARRAY(this);
+      }
+
+      @Override
+      public void copyFrom(ValuesReader from, ValuesWriter to) {
+        to.writeBytes(from.readBytes());
       }
     };
 
@@ -274,6 +316,8 @@ public final class PrimitiveType extends Type {
         PrimitiveConverter primitiveConverter, ColumnReader columnReader);
 
     abstract public <T, E extends Exception> T convert(PrimitiveTypeNameConverter<T, E> converter) throws E;
+
+    abstract public void copyFrom(ValuesReader reader, ValuesWriter writer);
 
   }
 

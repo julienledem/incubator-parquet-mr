@@ -26,11 +26,13 @@ import java.util.List;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.fs.Path;
 
+import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.example.data.Group;
 import org.apache.parquet.example.data.simple.SimpleGroup;
 import org.apache.parquet.filter2.compat.FilterCompat.Filter;
 import org.apache.parquet.hadoop.ParquetReader;
 import org.apache.parquet.hadoop.ParquetWriter;
+import org.apache.parquet.hadoop.example.ExampleParquetWriter;
 import org.apache.parquet.hadoop.example.GroupReadSupport;
 import org.apache.parquet.hadoop.example.GroupWriteSupport;
 import org.apache.parquet.schema.MessageType;
@@ -54,6 +56,10 @@ public class PhoneBookWriter {
           + "}\n";
 
   private static final MessageType schema = MessageTypeParser.parseMessageType(schemaString);
+
+  public static ColumnDescriptor getColumnDescriptor(String[] path) {
+    return schema.getColumnDescription(path);
+  }
 
   public static class Location {
     private final Double lon;
@@ -225,6 +231,32 @@ public class PhoneBookWriter {
 
     writeToFile(f, users);
 
+    return f;
+  }
+
+  public static File writeToFileWithPageHeaders(List<User> users, int dictionarySize, int pageSize) throws IOException {
+    File f = File.createTempFile("phonebook", ".parquet");
+    f.deleteOnExit();
+    if (!f.delete()) {
+      throw new IOException("couldn't delete tmp file" + f);
+    }
+    Configuration conf = new Configuration();
+    GroupWriteSupport.setSchema(schema, conf);
+
+    ParquetWriter<Group> writer = ExampleParquetWriter.builder(new Path(f.getAbsolutePath()))
+      .withConf(conf)
+      .withPageSize(pageSize)
+      .withDictionaryPageSize(dictionarySize)
+      .withDictionaryEncoding(true)
+      .withWriterVersion(ParquetWriter.DEFAULT_WRITER_VERSION)
+      .withCompressionCodec(ParquetWriter.DEFAULT_COMPRESSION_CODEC_NAME)
+      .withValidation(ParquetWriter.DEFAULT_IS_VALIDATING_ENABLED)
+      .withAddPageHeadersToFooter(true)
+      .build();
+    for (User u : users) {
+      writer.write(groupFromUser(u));
+    }
+    writer.close();
     return f;
   }
 

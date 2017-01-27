@@ -84,4 +84,15 @@ public class DefaultValuesWriterFactory implements ValuesWriterFactory {
       return writerToFallBackTo;
     }
   }
+
+  @Override
+  public ValuesWriter newFallbackValuesWriter(ColumnDescriptor path) {
+    return delegateFactory.newFallbackValuesWriter(path);
+  }
+
+  @Override
+  public DictionaryValuesWriter newDictionaryWriter(ColumnDescriptor path) {
+    return delegateFactory.newDictionaryWriter(path);
+  }
+
 }

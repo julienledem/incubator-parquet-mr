@@ -1,4 +1,4 @@
-/* 
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -18,12 +18,16 @@
  */
 package org.apache.parquet.hadoop.metadata;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 import java.util.Set;
 
 import org.apache.parquet.column.Encoding;
 import org.apache.parquet.column.EncodingStats;
 import org.apache.parquet.column.statistics.BooleanStatistics;
 import org.apache.parquet.column.statistics.Statistics;
+import org.apache.parquet.hadoop.PageHeaderWithOffset;
 import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
 
 /**
@@ -45,7 +49,7 @@ abstract public class ColumnChunkMetaData {
       long totalUncompressedSize) {
     return get(
         path, type, codec, null, encodings, new BooleanStatistics(), firstDataPage,
-        dictionaryPageOffset, valueCount, totalSize, totalUncompressedSize);
+        dictionaryPageOffset, valueCount, totalSize, totalUncompressedSize, Collections.<PageHeaderWithOffset>emptyList());
   }
 
   @Deprecated
@@ -62,7 +66,25 @@ abstract public class ColumnChunkMetaData {
       long totalUncompressedSize) {
     return get(
         path, type, codec, null, encodings, statistics, firstDataPage, dictionaryPageOffset,
-        valueCount, totalSize, totalUncompressedSize);
+        valueCount, totalSize, totalUncompressedSize, Collections.<PageHeaderWithOffset>emptyList());
+  }
+
+  @Deprecated
+  public static ColumnChunkMetaData get(
+      ColumnPath path,
+      PrimitiveTypeName type,
+      CompressionCodecName codec,
+      EncodingStats encodingStats,
+      Set<Encoding> encodings,
+      Statistics statistics,
+      long firstDataPage,
+      long dictionaryPageOffset,
+      long valueCount,
+      long totalSize,
+      long totalUncompressedSize) {
+    return get(
+        path, type, codec, null, encodings, statistics, firstDataPage, dictionaryPageOffset,
+        valueCount, totalSize, totalUncompressedSize, Collections.<PageHeaderWithOffset>emptyList());
   }
 
   public static ColumnChunkMetaData get(
@@ -76,7 +98,8 @@ abstract public class ColumnChunkMetaData {
       long dictionaryPageOffset,
       long valueCount,
       long totalSize,
-      long totalUncompressedSize) {
+      long totalUncompressedSize,
+      List<PageHeaderWithOffset> pageHeaders) {
     // to save space we store those always positive longs in ints when they fit.
     if (positiveLongFitsInAnInt(firstDataPage)
         && positiveLongFitsInAnInt(dictionaryPageOffset)
@@ -91,7 +114,8 @@ abstract public class ColumnChunkMetaData {
           dictionaryPageOffset,
           valueCount,
           totalSize,
-          totalUncompressedSize);
+          totalUncompressedSize,
+          pageHeaders);
     } else {
       return new LongColumnChunkMetaData(
           path, type, codec,
@@ -101,7 +125,8 @@ abstract public class ColumnChunkMetaData {
           dictionaryPageOffset,
           valueCount,
           totalSize,
-          totalUncompressedSize);
+          totalUncompressedSize,
+          pageHeaders);
     }
   }
 
@@ -192,6 +217,11 @@ abstract public class ColumnChunkMetaData {
   abstract public Statistics getStatistics();
 
   /**
+   * @return page headers for this column chunk
+   */
+  abstract public List<PageHeaderWithOffset> getPageHeaders();
+
+  /**
    * @return all the encodings used in this column
    */
   public Set<Encoding> getEncodings() {
@@ -216,6 +246,7 @@ class IntColumnChunkMetaData extends ColumnChunkMetaData {
   private final int totalSize;
   private final int totalUncompressedSize;
   private final Statistics statistics;
+  private final List<PageHeaderWithOffset> pageHeaders;
 
   /**
    * @param path column identifier
@@ -228,6 +259,7 @@ class IntColumnChunkMetaData extends ColumnChunkMetaData {
    * @param valueCount
    * @param totalSize
    * @param totalUncompressedSize
+   * @param pageHeaders
    */
   IntColumnChunkMetaData(
       ColumnPath path,
@@ -240,7 +272,8 @@ class IntColumnChunkMetaData extends ColumnChunkMetaData {
       long dictionaryPageOffset,
       long valueCount,
       long totalSize,
-      long totalUncompressedSize) {
+      long totalUncompressedSize,
+      List<PageHeaderWithOffset> pageHeaders) {
     super(encodingStats, ColumnChunkProperties.get(path, type, codec, encodings));
     this.firstDataPage = positiveLongToInt(firstDataPage);
     this.dictionaryPageOffset = positiveLongToInt(dictionaryPageOffset);
@@ -248,6 +281,7 @@ class IntColumnChunkMetaData extends ColumnChunkMetaData {
     this.totalSize = positiveLongToInt(totalSize);
     this.totalUncompressedSize = positiveLongToInt(totalUncompressedSize);
     this.statistics = statistics;
+    this.pageHeaders = new ArrayList<PageHeaderWithOffset>(pageHeaders);
   }
 
   /**
@@ -312,7 +346,16 @@ class IntColumnChunkMetaData extends ColumnChunkMetaData {
   public Statistics getStatistics() {
    return statistics;
   }
+
+  /**
+   * @return page headers for this column chunk
+   */
+  @Override
+  public List<PageHeaderWithOffset> getPageHeaders() {
+    return pageHeaders;
+  }
 }
+
 class LongColumnChunkMetaData extends ColumnChunkMetaData {
 
   private final long firstDataPageOffset;
@@ -321,6 +364,7 @@ class LongColumnChunkMetaData extends ColumnChunkMetaData {
   private final long totalSize;
   private final long totalUncompressedSize;
   private final Statistics statistics;
+  private final List<PageHeaderWithOffset> pageHeaders;
 
   /**
    * @param path column identifier
@@ -333,6 +377,7 @@ class LongColumnChunkMetaData extends ColumnChunkMetaData {
    * @param valueCount
    * @param totalSize
    * @param totalUncompressedSize
+   * @param pageHeaders
    */
   LongColumnChunkMetaData(
       ColumnPath path,
@@ -345,7 +390,8 @@ class LongColumnChunkMetaData extends ColumnChunkMetaData {
       long dictionaryPageOffset,
       long valueCount,
       long totalSize,
-      long totalUncompressedSize) {
+      long totalUncompressedSize,
+      List<PageHeaderWithOffset> pageHeaders) {
     super(encodingStats, ColumnChunkProperties.get(path, type, codec, encodings));
     this.firstDataPageOffset = firstDataPageOffset;
     this.dictionaryPageOffset = dictionaryPageOffset;
@@ -353,6 +399,7 @@ class LongColumnChunkMetaData extends ColumnChunkMetaData {
     this.totalSize = totalSize;
     this.totalUncompressedSize = totalUncompressedSize;
     this.statistics = statistics;
+    this.pageHeaders = new ArrayList<PageHeaderWithOffset>(pageHeaders);
   }
 
   /**
@@ -395,6 +442,14 @@ class LongColumnChunkMetaData extends ColumnChunkMetaData {
    */
   public Statistics getStatistics() {
    return statistics;
+  }
+
+  /**
+   * @return page headers for this column chunk
+   */
+  @Override
+  public List<PageHeaderWithOffset> getPageHeaders() {
+    return pageHeaders;
   }
 }
 

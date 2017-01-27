@@ -18,21 +18,20 @@
  */
 package org.apache.parquet.hadoop;
 
+import static org.apache.parquet.Preconditions.checkNotNull;
+
 import java.io.IOException;
 import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.mapreduce.RecordWriter;
 import org.apache.hadoop.mapreduce.TaskAttemptContext;
-
 import org.apache.parquet.column.ParquetProperties;
 import org.apache.parquet.column.ParquetProperties.WriterVersion;
 import org.apache.parquet.hadoop.CodecFactory.BytesCompressor;
 import org.apache.parquet.hadoop.api.WriteSupport;
 import org.apache.parquet.hadoop.metadata.CompressionCodecName;
 import org.apache.parquet.schema.MessageType;
-
-import static org.apache.parquet.Preconditions.checkNotNull;
 
 /**
  * Writes records to a Parquet file
@@ -96,6 +95,7 @@ public class ParquetRecordWriter<T> extends RecordWriter<Void, T> {
    * @param dictionaryPageSize the threshold for dictionary size
    * @param enableDictionary to enable the dictionary
    * @param validating if schema validation should be turned on
+   * @param addPageHeadersToMetadata add page headers to column chunk metadata
    */
   @Deprecated
   public ParquetRecordWriter(
