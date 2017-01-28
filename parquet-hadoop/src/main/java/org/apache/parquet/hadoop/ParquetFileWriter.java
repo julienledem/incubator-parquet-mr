@@ -325,6 +325,11 @@ public class ParquetFileWriter {
     currentPageHeaders.clear();
   }
 
+  @Deprecated
+  public void writeDictionaryPage(DictionaryPage dictionaryPage) throws IOException {
+    writeDictionaryPage(dictionaryPage, false);
+  }
+
   /**
    * writes a dictionary page page
    * @param dictionaryPage the dictionary page
@@ -335,7 +340,7 @@ public class ParquetFileWriter {
     currentChunkDictionaryPageOffset = out.getPos();
     int uncompressedSize = dictionaryPage.getUncompressedSize();
     int compressedPageSize = (int)dictionaryPage.getBytes().size(); // TODO: fix casts
-    final PageHeader pageHeader = metadataConverter.writeDictionaryPageHeader(
+    final PageHeader pageHeader = metadataConverter.writeAndReturnDictionaryPageHeader(
         uncompressedSize,
         compressedPageSize,
         dictionaryPage.getDictionarySize(),
@@ -374,7 +379,7 @@ public class ParquetFileWriter {
     long beforeHeader = out.getPos();
     if (DEBUG) LOG.debug(beforeHeader + ": write data page: " + valueCount + " values");
     int compressedPageSize = (int)bytes.size();
-    final PageHeader pageHeader = metadataConverter.writeDataPageHeader(
+    final PageHeader pageHeader = metadataConverter.writeAndReturnDataPageHeader(
         uncompressedPageSize, compressedPageSize,
         valueCount,
         rlEncoding,
@@ -414,7 +419,7 @@ public class ParquetFileWriter {
     long beforeHeader = out.getPos();
     if (DEBUG) LOG.debug(beforeHeader + ": write data page: " + valueCount + " values");
     int compressedPageSize = (int)bytes.size();
-    final PageHeader pageHeader = metadataConverter.writeDataPageHeader(
+    final PageHeader pageHeader = metadataConverter.writeAndReturnDataPageHeader(
         uncompressedPageSize, compressedPageSize,
         valueCount,
         statistics,

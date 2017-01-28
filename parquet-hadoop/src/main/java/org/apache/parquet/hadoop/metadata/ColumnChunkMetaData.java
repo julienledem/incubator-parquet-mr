@@ -35,6 +35,7 @@ import org.apache.parquet.schema.PrimitiveType.PrimitiveTypeName;
  * @author Julien Le Dem
  */
 abstract public class ColumnChunkMetaData {
+  private static final List<PageHeaderWithOffset> EMPTY_PAGE_HEADERS = Collections.emptyList();
 
   @Deprecated
   public static ColumnChunkMetaData get(
@@ -49,7 +50,7 @@ abstract public class ColumnChunkMetaData {
       long totalUncompressedSize) {
     return get(
         path, type, codec, null, encodings, new BooleanStatistics(), firstDataPage,
-        dictionaryPageOffset, valueCount, totalSize, totalUncompressedSize, Collections.<PageHeaderWithOffset>emptyList());
+        dictionaryPageOffset, valueCount, totalSize, totalUncompressedSize, EMPTY_PAGE_HEADERS);
   }
 
   @Deprecated
@@ -66,7 +67,7 @@ abstract public class ColumnChunkMetaData {
       long totalUncompressedSize) {
     return get(
         path, type, codec, null, encodings, statistics, firstDataPage, dictionaryPageOffset,
-        valueCount, totalSize, totalUncompressedSize, Collections.<PageHeaderWithOffset>emptyList());
+        valueCount, totalSize, totalUncompressedSize, EMPTY_PAGE_HEADERS);
   }
 
   @Deprecated
@@ -84,7 +85,7 @@ abstract public class ColumnChunkMetaData {
       long totalUncompressedSize) {
     return get(
         path, type, codec, null, encodings, statistics, firstDataPage, dictionaryPageOffset,
-        valueCount, totalSize, totalUncompressedSize, Collections.<PageHeaderWithOffset>emptyList());
+        valueCount, totalSize, totalUncompressedSize, EMPTY_PAGE_HEADERS);
   }
 
   public static ColumnChunkMetaData get(

@@ -130,7 +130,7 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
                 + compressedSize);
       }
       tempOutputStream.reset();
-      final PageHeader pageHeader = parquetMetadataConverter.writeDataPageHeader(
+      final PageHeader pageHeader = parquetMetadataConverter.writeAndReturnDataPageHeader(
           (int)uncompressedSize,
           (int)compressedSize,
           pageV1Holder.getValueCount(),
@@ -182,7 +182,7 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
           compressedData.size() + repetitionLevels.size() + definitionLevels.size()
       );
       tempOutputStream.reset();
-      final PageHeader pageHeader = parquetMetadataConverter.writeDataPageV2Header(
+      final PageHeader pageHeader = parquetMetadataConverter.writeAndReturnDataPageV2Header(
           uncompressedSize, compressedSize,
           pageV2Holder.getValueCount(),
           pageV2Holder.getNullCount(),

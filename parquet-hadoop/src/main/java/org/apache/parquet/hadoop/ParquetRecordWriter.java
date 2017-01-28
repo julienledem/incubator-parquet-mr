@@ -95,6 +95,35 @@ public class ParquetRecordWriter<T> extends RecordWriter<Void, T> {
    * @param dictionaryPageSize the threshold for dictionary size
    * @param enableDictionary to enable the dictionary
    * @param validating if schema validation should be turned on
+   */
+  @Deprecated
+  public ParquetRecordWriter(
+    ParquetFileWriter w,
+    WriteSupport<T> writeSupport,
+    MessageType schema,
+    Map<String, String> extraMetaData,
+    long blockSize,
+    int pageSize,
+    BytesCompressor compressor,
+    int dictionaryPageSize,
+    boolean enableDictionary,
+    boolean validating,
+    WriterVersion writerVersion,
+    MemoryManager memoryManager) {
+    this(w, writeSupport, schema, extraMetaData, blockSize, pageSize, compressor, dictionaryPageSize, enableDictionary, validating, writerVersion, memoryManager, false);
+  }
+
+  /**
+   *
+   * @param w the file to write to
+   * @param writeSupport the class to convert incoming records
+   * @param schema the schema of the records
+   * @param extraMetaData extra meta data to write in the footer of the file
+   * @param blockSize the size of a block in the file (this will be approximate)
+   * @param compressor the compressor used to compress the pages
+   * @param dictionaryPageSize the threshold for dictionary size
+   * @param enableDictionary to enable the dictionary
+   * @param validating if schema validation should be turned on
    * @param addPageHeadersToMetadata add page headers to column chunk metadata
    */
   @Deprecated
@@ -109,12 +138,14 @@ public class ParquetRecordWriter<T> extends RecordWriter<Void, T> {
       boolean enableDictionary,
       boolean validating,
       WriterVersion writerVersion,
-      MemoryManager memoryManager) {
+      MemoryManager memoryManager,
+      boolean addPageHeadersToMetadata) {
     ParquetProperties props = ParquetProperties.builder()
         .withPageSize(pageSize)
         .withDictionaryPageSize(dictionaryPageSize)
         .withDictionaryEncoding(enableDictionary)
         .withWriterVersion(writerVersion)
+        .addPageHeadersToMetadata(addPageHeadersToMetadata)
         .build();
     internalWriter = new InternalParquetRecordWriter<T>(w, writeSupport, schema,
         extraMetaData, blockSize, compressor, validating, props);

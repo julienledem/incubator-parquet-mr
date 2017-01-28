@@ -103,7 +103,7 @@ public class ParquetMetadataConverter {
   // an unsynchronized collection in Collections.unmodifiable*(), and making sure to not
   // keep any references to the original collection.
   private static final ConcurrentHashMap<Set<org.apache.parquet.column.Encoding>, Set<org.apache.parquet.column.Encoding>>
-      cachedEncodingSets = new ConcurrentHashMap<Set<org.apache.parquet.column.Encoding>, Set<org.apache.parquet.column.Encoding>>();
+    cachedEncodingSets = new ConcurrentHashMap<Set<org.apache.parquet.column.Encoding>, Set<org.apache.parquet.column.Encoding>>();
 
   public FileMetaData toParquetMetadata(int currentVersion, ParquetMetadata parquetMetadata) {
     List<BlockMetaData> blocks = parquetMetadata.getBlocks();
@@ -114,10 +114,10 @@ public class ParquetMetadataConverter {
       addRowGroup(parquetMetadata, rowGroups, block);
     }
     FileMetaData fileMetaData = new FileMetaData(
-        currentVersion,
-        toParquetSchema(parquetMetadata.getFileMetaData().getSchema()),
-        numRows,
-        rowGroups);
+      currentVersion,
+      toParquetSchema(parquetMetadata.getFileMetaData().getSchema()),
+      numRows,
+      rowGroups);
 
     Set<Entry<String, String>> keyValues = parquetMetadata.getFileMetaData().getKeyValueMetaData().entrySet();
     for (Entry<String, String> keyValue : keyValues) {
@@ -172,7 +172,7 @@ public class ParquetMetadataConverter {
       }
 
       private void visitChildren(final List<SchemaElement> result,
-          GroupType groupType, SchemaElement element) {
+                                 GroupType groupType, SchemaElement element) {
         element.setNum_children(groupType.getFieldCount());
         result.add(element);
         for (org.apache.parquet.schema.Type field : groupType.getFields()) {
@@ -190,18 +190,18 @@ public class ParquetMetadataConverter {
       ColumnChunk columnChunk = new ColumnChunk(columnMetaData.getFirstDataPageOffset()); // verify this is the right offset
       columnChunk.file_path = block.getPath(); // they are in the same file for now
       columnChunk.meta_data = new ColumnMetaData(
-          getType(columnMetaData.getType()),
-          toFormatEncodings(columnMetaData.getEncodings()),
-          Arrays.asList(columnMetaData.getPath().toArray()),
-          columnMetaData.getCodec().getParquetCompressionCodec(),
-          columnMetaData.getValueCount(),
-          columnMetaData.getTotalUncompressedSize(),
-          columnMetaData.getTotalSize(),
-          columnMetaData.getFirstDataPageOffset());
+        getType(columnMetaData.getType()),
+        toFormatEncodings(columnMetaData.getEncodings()),
+        Arrays.asList(columnMetaData.getPath().toArray()),
+        columnMetaData.getCodec().getParquetCompressionCodec(),
+        columnMetaData.getValueCount(),
+        columnMetaData.getTotalUncompressedSize(),
+        columnMetaData.getTotalSize(),
+        columnMetaData.getFirstDataPageOffset());
       // add page headers
       final List<PageHeaderWithOffset> pageHeaders = columnMetaData.getPageHeaders();
       if (pageHeaders != null && !pageHeaders.isEmpty()) {
-        for (PageHeaderWithOffset pageHeader: pageHeaders) {
+        for (PageHeaderWithOffset pageHeader : pageHeaders) {
           columnChunk.meta_data.addToPage_headers(new org.apache.parquet.format.PageHeaderWithOffset(
             pageHeader.getPageHeader(), pageHeader.getOffset()
           ));
@@ -308,7 +308,7 @@ public class ParquetMetadataConverter {
   }
 
   public static Statistics toParquetStatistics(
-      org.apache.parquet.column.statistics.Statistics statistics) {
+    org.apache.parquet.column.statistics.Statistics statistics) {
     Statistics stats = new Statistics();
     // Don't write stats larger than the max size rather than truncating. The
     // rationale is that some engines may use the minimum value in the page as
@@ -326,7 +326,7 @@ public class ParquetMetadataConverter {
 
   /**
    * @deprecated Replaced by {@link #fromParquetStatistics(
-   * String createdBy, Statistics statistics, PrimitiveTypeName type)}
+   *String createdBy, Statistics statistics, PrimitiveTypeName type)}
    */
   @Deprecated
   public static org.apache.parquet.column.statistics.Statistics fromParquetStatistics(Statistics statistics, PrimitiveTypeName type) {
@@ -617,8 +617,8 @@ public class ParquetMetadataConverter {
         return ConvertedType.BSON;
       default:
         throw new RuntimeException("Unknown original type " + type);
-     }
-   }
+    }
+  }
 
   private static void addKeyValue(FileMetaData fileMetaData, String key, String value) {
     KeyValue keyValue = new KeyValue(key);
@@ -628,18 +628,23 @@ public class ParquetMetadataConverter {
 
   private static interface MetadataFilterVisitor<T, E extends Throwable> {
     T visit(NoFilter filter) throws E;
+
     T visit(SkipMetadataFilter filter) throws E;
+
     T visit(RangeMetadataFilter filter) throws E;
     T visit(OffsetMetadataFilter filter) throws E;
   }
 
   public abstract static class MetadataFilter {
-    private MetadataFilter() {}
+    private MetadataFilter() {
+    }
+
     abstract <T, E extends Throwable> T accept(MetadataFilterVisitor<T, E> visitor) throws E;
   }
 
   /**
    * [ startOffset, endOffset )
+   *
    * @param startOffset
    * @param endOffset
    * @return the filter
@@ -657,22 +662,29 @@ public class ParquetMetadataConverter {
   }
 
   private static final class NoFilter extends MetadataFilter {
-    private NoFilter() {}
+    private NoFilter() {
+    }
+
     @Override
     <T, E extends Throwable> T accept(MetadataFilterVisitor<T, E> visitor) throws E {
       return visitor.visit(this);
     }
+
     @Override
     public String toString() {
       return "NO_FILTER";
     }
   }
+
   private static final class SkipMetadataFilter extends MetadataFilter {
-    private SkipMetadataFilter() {}
+    private SkipMetadataFilter() {
+    }
+
     @Override
     <T, E extends Throwable> T accept(MetadataFilterVisitor<T, E> visitor) throws E {
       return visitor.visit(this);
     }
+
     @Override
     public String toString() {
       return "SKIP_ROW_GROUPS";
@@ -681,6 +693,7 @@ public class ParquetMetadataConverter {
 
   /**
    * [ startOffset, endOffset )
+   *
    * @author Julien Le Dem
    */
   // Visible for testing
@@ -767,6 +780,7 @@ public class ParquetMetadataConverter {
   static long getOffset(RowGroup rowGroup) {
     return getOffset(rowGroup.getColumns().get(0));
   }
+
   // Visible for testing
   static long getOffset(ColumnChunk columnChunk) {
     ColumnMetaData md = columnChunk.getMeta_data();
@@ -818,7 +832,7 @@ public class ParquetMetadataConverter {
         String filePath = columns.get(0).getFile_path();
         for (ColumnChunk columnChunk : columns) {
           if ((filePath == null && columnChunk.getFile_path() != null)
-              || (filePath != null && !filePath.equals(columnChunk.getFile_path()))) {
+            || (filePath != null && !filePath.equals(columnChunk.getFile_path()))) {
             throw new ParquetDecodingException("all column chunks of the same row group must be in the same file for now");
           }
           ColumnMetaData metaData = columnChunk.meta_data;
@@ -862,8 +876,8 @@ public class ParquetMetadataConverter {
       }
     }
     return new ParquetMetadata(
-        new org.apache.parquet.hadoop.metadata.FileMetaData(messageType, keyValueMetaData, parquetMetadata.getCreated_by()),
-        blocks);
+      new org.apache.parquet.hadoop.metadata.FileMetaData(messageType, keyValueMetaData, parquetMetadata.getCreated_by()),
+      blocks);
   }
 
   private static ColumnPath getPath(ColumnMetaData metaData) {
@@ -890,8 +904,8 @@ public class ParquetMetadataConverter {
       Types.Builder childBuilder;
       if (schemaElement.type != null) {
         Types.PrimitiveBuilder primitiveBuilder = builder.primitive(
-            getPrimitive(schemaElement.type),
-            fromParquetRepetition(schemaElement.repetition_type));
+          getPrimitive(schemaElement.type),
+          fromParquetRepetition(schemaElement.repetition_type));
         if (schemaElement.isSetType_length()) {
           primitiveBuilder.length(schemaElement.type_length);
         }
@@ -930,7 +944,18 @@ public class ParquetMetadataConverter {
   }
 
   @Deprecated
-  public PageHeader writeDataPageHeader(
+  public void writeDataPageHeader(
+    int uncompressedSize,
+    int compressedSize,
+    int valueCount,
+    org.apache.parquet.column.Encoding rlEncoding,
+    org.apache.parquet.column.Encoding dlEncoding,
+    org.apache.parquet.column.Encoding valuesEncoding,
+    OutputStream to) throws IOException {
+     writeAndReturnDataPageHeader(uncompressedSize, compressedSize, valueCount, rlEncoding, dlEncoding, valuesEncoding, to);
+  }
+
+  public PageHeader writeAndReturnDataPageHeader(
       int uncompressedSize,
       int compressedSize,
       int valueCount,
@@ -949,7 +974,20 @@ public class ParquetMetadataConverter {
     return pageHeader;
   }
 
-  public PageHeader writeDataPageHeader(
+  @Deprecated
+  public void writeDataPageHeader(
+    int uncompressedSize,
+    int compressedSize,
+    int valueCount,
+    org.apache.parquet.column.statistics.Statistics statistics,
+    org.apache.parquet.column.Encoding rlEncoding,
+    org.apache.parquet.column.Encoding dlEncoding,
+    org.apache.parquet.column.Encoding valuesEncoding,
+    OutputStream to) throws IOException {
+    writeAndReturnDataPageHeader(uncompressedSize, compressedSize, valueCount, statistics, rlEncoding, dlEncoding, valuesEncoding, to);
+  }
+
+  public PageHeader writeAndReturnDataPageHeader(
       int uncompressedSize,
       int compressedSize,
       int valueCount,
@@ -985,7 +1023,19 @@ public class ParquetMetadataConverter {
     return pageHeader;
   }
 
-  public PageHeader writeDataPageV2Header(
+  @Deprecated
+  public void writeDataPageV2Header(
+    int uncompressedSize, int compressedSize,
+    int valueCount, int nullCount, int rowCount,
+    org.apache.parquet.column.statistics.Statistics statistics,
+    org.apache.parquet.column.Encoding dataEncoding,
+    int rlByteLength, int dlByteLength,
+    OutputStream to) throws IOException {
+    writeAndReturnDataPageV2Header(uncompressedSize, compressedSize, valueCount, nullCount, rowCount, statistics,
+      dataEncoding, rlByteLength, dlByteLength, to);
+  }
+
+  public PageHeader writeAndReturnDataPageV2Header(
       int uncompressedSize, int compressedSize,
       int valueCount, int nullCount, int rowCount,
       org.apache.parquet.column.statistics.Statistics statistics,
@@ -1022,7 +1072,14 @@ public class ParquetMetadataConverter {
     return pageHeader;
   }
 
-  public PageHeader writeDictionaryPageHeader(
+  @Deprecated
+  public void writeDictionaryPageHeader(
+    int uncompressedSize, int compressedSize, int valueCount,
+    org.apache.parquet.column.Encoding valuesEncoding, OutputStream to) throws IOException {
+    writeAndReturnDictionaryPageHeader(uncompressedSize, compressedSize, valueCount, valuesEncoding, false, to);
+  }
+
+  public PageHeader writeAndReturnDictionaryPageHeader(
       int uncompressedSize, int compressedSize, int valueCount,
       org.apache.parquet.column.Encoding valuesEncoding, boolean sorted, OutputStream to) throws IOException {
     PageHeader pageHeader = new PageHeader(PageType.DICTIONARY_PAGE, uncompressedSize, compressedSize);
