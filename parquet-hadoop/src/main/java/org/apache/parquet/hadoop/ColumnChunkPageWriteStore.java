@@ -242,8 +242,10 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
         final PageHeaderWithOffset pageHeader;
         if (PageType.V1 == bufferedPage.getType()) {
           pageHeader = preparePage((PageV1Holder)bufferedPage, pageOffset);
-        } else {
+        } else if (PageType.V2 == bufferedPage.getType()) {
           pageHeader = preparePage((PageV2Holder)bufferedPage, pageOffset);
+        } else {
+          throw new IOException("Invalid page type " + bufferedPage.getType());
         }
         pageHeaderWithOffsets.add(pageHeader);
 
@@ -299,6 +301,8 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
                   pageHolder.setData(BytesInput.concat(rldlBytes, BytesInput.copy(valuesWriter.getBytes())));
                 } else if (PageType.V2 == pageHolder.getType()) {
                   pageHolder.setData(BytesInput.copy(valuesWriter.getBytes()));
+                } else {
+                  throw new IOException("Invalid page type " + pageHolder.getType());
                 }
                 pageHolder.setValuesEncoding(valuesWriter.getEncoding());
               } finally {
@@ -339,11 +343,13 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
             final int oldDictionaryId = dictionaryBasedValuesReader.readValueDictionaryId();
             encodedValues.add(sortedDictionary.getNewId(oldDictionaryId));
           }
-          if (pageHolder instanceof PageV1Holder) {
+          if (PageType.V1 == pageHolder.getType()) {
             final BytesInput rldlBytes = BytesInput.from(data.toByteBuffer(), 0, pageDataOffset);
-            pageHolder.setData(BytesInput.concat(rldlBytes, BytesInput.copy(valuesWriter.getBytes(encodedValues))));
+            pageHolder.setData(BytesInput.concat(rldlBytes, BytesInput.copy(valuesWriter.getBytes(encodedValues, sortedDictionary.getSize()))));
+          } else if (PageType.V2 == pageHolder.getType()) {
+            pageHolder.setData(BytesInput.copy(valuesWriter.getBytes(encodedValues, sortedDictionary.getSize())));
           } else {
-            pageHolder.setData(BytesInput.copy(valuesWriter.getBytes(encodedValues)));
+            throw new IOException("Invalid page type " + pageHolder.getType());
           }
         } finally {
           valuesWriter.close();

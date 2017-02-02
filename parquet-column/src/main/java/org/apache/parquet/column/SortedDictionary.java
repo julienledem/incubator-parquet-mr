@@ -114,6 +114,10 @@ public class SortedDictionary {
     }
   }
 
+  public int getSize() {
+    return this.sortedDictionaryPage.getDictionarySize();
+  }
+
   private IntComparator getValueComparator(ColumnDescriptor columnDescriptor) {
     switch (columnDescriptor.getType()) {
       case BINARY:

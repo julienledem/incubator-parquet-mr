@@ -161,8 +161,8 @@ public abstract class DictionaryValuesWriter extends ValuesWriter implements Req
    * @param encodedValues dictionary ids for encoded values
    * @return dictionary encoded data
    */
-  public BytesInput getBytes(IntList encodedValues) {
-    final int maxDicId = getDictionarySize() - 1;
+  public BytesInput getBytes(IntList encodedValues, int dictionarySize) {
+    final int maxDicId = dictionarySize - 1;
     if (DEBUG) LOG.debug("max dic id " + maxDicId);
     final int bitWidth = BytesUtils.getWidthFromMaxInt(maxDicId);
     final int initialSlabSize =
@@ -197,7 +197,7 @@ public abstract class DictionaryValuesWriter extends ValuesWriter implements Req
 
   @Override
   public BytesInput getBytes() {
-    final BytesInput data = getBytes(encodedValues);
+    final BytesInput data = getBytes(encodedValues, getDictionarySize());
     recordDictionarySize();
     return data;
   }
