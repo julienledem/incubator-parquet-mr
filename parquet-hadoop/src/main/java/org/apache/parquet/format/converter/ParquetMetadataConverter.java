@@ -207,7 +207,7 @@ public class ParquetMetadataConverter {
           ));
         }
       }
-      columnChunk.meta_data.dictionary_page_offset = columnMetaData.getDictionaryPageOffset();
+      columnChunk.meta_data.setDictionary_page_offset(columnMetaData.getDictionaryPageOffset());
       if (!columnMetaData.getStatistics().isEmpty()) {
         columnChunk.meta_data.setStatistics(toParquetStatistics(columnMetaData.getStatistics()));
       }

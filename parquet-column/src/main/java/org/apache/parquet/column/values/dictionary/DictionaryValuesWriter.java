@@ -113,9 +113,13 @@ public abstract class DictionaryValuesWriter extends ValuesWriter implements Req
   }
 
   protected DictionaryPage dictPage(ValuesWriter dictPageWriter) {
-    DictionaryPage ret = new DictionaryPage(dictPageWriter.getBytes(), lastUsedDictionarySize, encodingForDictionaryPage);
-    dictPageWriter.close();
-    return ret;
+    try {
+      DictionaryPage ret = new DictionaryPage(BytesInput.copy(dictPageWriter.getBytes()), lastUsedDictionarySize, encodingForDictionaryPage);
+      dictPageWriter.close();
+      return ret;
+    } catch (IOException e) {
+      throw new ParquetEncodingException("could not create dictionary page", e);
+    }
   }
 
   @Override

@@ -317,6 +317,7 @@ public class ParquetFileWriter {
     currentChunkCodec = compressionCodecName;
     currentChunkValueCount = valueCount;
     currentChunkFirstDataPage = out.getPos();
+    currentChunkDictionaryPageOffset = 0;
     compressedLength = 0;
     uncompressedLength = 0;
     // need to know what type of stats to initialize to
@@ -356,6 +357,7 @@ public class ParquetFileWriter {
     encodingStatsBuilder.addDictEncoding(dictionaryPage.getEncoding());
     currentEncodings.add(dictionaryPage.getEncoding());
     currentPageHeaders.add(new PageHeaderWithOffset(pageHeader, currentPos));
+    currentChunkFirstDataPage = out.getPos(); // rewrite first data page offset
   }
 
 

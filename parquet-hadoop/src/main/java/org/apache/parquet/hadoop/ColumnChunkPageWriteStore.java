@@ -68,7 +68,7 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
 
     private final ByteArrayOutputStream tempOutputStream = new ByteArrayOutputStream();
     private final ConcatenatingByteArrayCollector buf;
-    private DictionaryPage dictionaryPage;
+    private DictionaryPage bufferedDictionaryPage;
 
     private long uncompressedLength;
     private long compressedLength;
@@ -272,7 +272,7 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
     }
 
     private void checkDictionaryEncoding() throws IOException {
-      if (dictionaryPage != null) {
+      if (bufferedDictionaryPage != null) {
         boolean allDictionaryEncodedPages = true;
         for (PageHolder pageHolder : bufferedPages) {
           if (!pageHolder.getValuesEncoding().usesDictionary()) {
@@ -282,7 +282,7 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
         }
         // Undo dictionary encoding
         if (!allDictionaryEncodedPages) {
-          final Dictionary dictionary = dictionaryPage.getEncoding().initDictionary(path, dictionaryPage);
+          final Dictionary dictionary = bufferedDictionaryPage.getEncoding().initDictionary(path, bufferedDictionaryPage);
           for (PageHolder pageHolder : bufferedPages) {
             if (pageHolder.getValuesEncoding().usesDictionary()) {
               final ValuesWriter valuesWriter = parquetProperties.newFallbackValuesWriter(path);
@@ -310,7 +310,7 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
               }
             }
           }
-          dictionaryPage = null;
+          bufferedDictionaryPage = null;
         }
       }
     }
@@ -318,13 +318,13 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
     public void writeToFileWriter(ParquetFileWriter writer) throws IOException {
       checkDictionaryEncoding();
 
-      if (dictionaryPage == null) {
+      if (bufferedDictionaryPage == null) {
         writeBufferedPages(writer, null);
         return;
       }
 
       // Copy dictionary page and create a sorted dictionary
-      final SortedDictionary sortedDictionary = new SortedDictionary(dictionaryPage, path, parquetProperties);
+      final SortedDictionary sortedDictionary = new SortedDictionary(bufferedDictionaryPage, path, parquetProperties);
 
       // For each buffered page, read dictionary ids and map them to new ids.
       // Use dictionary writer to serialize newly encoded values to bytes
@@ -365,12 +365,12 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
 
     @Override
     public void writeDictionaryPage(DictionaryPage dictionaryPage) throws IOException {
-      if (this.dictionaryPage != null) {
+      if (this.bufferedDictionaryPage != null) {
         throw new ParquetEncodingException("Only one dictionary page is allowed");
       }
       BytesInput dictionaryBytes = dictionaryPage.getBytes();
       int uncompressedSize = (int)dictionaryBytes.size();
-      this.dictionaryPage = new DictionaryPage(BytesInput.copy(dictionaryBytes), uncompressedSize, dictionaryPage.getDictionarySize(), dictionaryPage.getEncoding());
+      this.bufferedDictionaryPage = new DictionaryPage(BytesInput.copy(dictionaryBytes), uncompressedSize, dictionaryPage.getDictionarySize(), dictionaryPage.getEncoding());
     }
 
     @Override
