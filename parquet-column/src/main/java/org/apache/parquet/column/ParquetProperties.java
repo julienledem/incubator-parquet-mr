@@ -32,9 +32,11 @@ import org.apache.parquet.column.values.bitpacking.DevNullValuesWriter;
 import org.apache.parquet.column.values.dictionary.DictionaryValuesWriter;
 import org.apache.parquet.column.values.factory.DefaultValuesWriterFactory;
 import org.apache.parquet.column.values.factory.ValuesWriterFactory;
+import org.apache.parquet.column.values.fallback.FallbackValuesWriter;
 import org.apache.parquet.column.values.rle.RunLengthBitPackingHybridEncoder;
 import org.apache.parquet.column.values.rle.RunLengthBitPackingHybridValuesWriter;
 import org.apache.parquet.schema.MessageType;
+import org.apache.parquet.schema.PrimitiveType;
 
 /**
  * This class represents all the configurable Parquet properties.
@@ -85,6 +87,7 @@ public class ParquetProperties {
   private final int minRowCountForPageSizeCheck;
   private final int maxRowCountForPageSizeCheck;
   private final boolean estimateNextSizeCheck;
+  private final boolean enableDictionarForBinaryType;
   private final ByteBufferAllocator allocator;
   private final ValuesWriterFactory valuesWriterFactory;
   private final boolean addPageHeadersToMetadata;
@@ -92,7 +95,7 @@ public class ParquetProperties {
 
   private ParquetProperties(WriterVersion writerVersion, int pageSize, int dictPageSize, boolean enableDict, int minRowCountForPageSizeCheck,
                             int maxRowCountForPageSizeCheck, boolean estimateNextSizeCheck, ByteBufferAllocator allocator,
-                            ValuesWriterFactory writerFactory, boolean addPageHeadersToMetadata) {
+                            ValuesWriterFactory writerFactory, boolean addPageHeadersToMetadata, boolean enableDictionarForBinaryType) {
     this.pageSizeThreshold = pageSize;
     this.initialSlabSize = CapacityByteArrayOutputStream
       .initialSlabSizeHeuristic(MIN_SLAB_SIZE, pageSizeThreshold, 10);
@@ -106,6 +109,7 @@ public class ParquetProperties {
 
     this.valuesWriterFactory = writerFactory;
     this.addPageHeadersToMetadata = addPageHeadersToMetadata;
+    this.enableDictionarForBinaryType = enableDictionarForBinaryType;
   }
 
   public ValuesWriter newRepetitionLevelWriter(ColumnDescriptor path) {
@@ -142,6 +146,25 @@ public class ParquetProperties {
     return valuesWriterFactory.newValuesWriter(path);
   }
 
+  private boolean isBinaryType(PrimitiveType.PrimitiveTypeName type) {
+    return (PrimitiveType.PrimitiveTypeName.BINARY == type || PrimitiveType.PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY == type);
+  }
+
+  public boolean shouldDictionaryEncode(ColumnDescriptor path) {
+    return enableDictionary || (isBinaryType(path.getType()) && enableDictionarForBinaryType);
+  }
+
+  private ValuesWriter dictWriterWithFallBack(ColumnDescriptor path) {
+    ValuesWriter writerToFallBackTo = newFallbackValuesWriter(path);
+    if (shouldDictionaryEncode(path)) {
+      return FallbackValuesWriter.of(
+          newDictionaryWriter(path),
+          writerToFallBackTo);
+    } else {
+     return writerToFallBackTo;
+    }
+  }
+
   public DictionaryValuesWriter newDictionaryWriter(ColumnDescriptor path) {
     return valuesWriterFactory.newDictionaryWriter(path);
   }
@@ -158,6 +181,10 @@ public class ParquetProperties {
     return initialSlabSize;
   }
 
+  public boolean isEnableDictionarForBinaryType() {
+    return enableDictionarForBinaryType;
+  }
+
   public int getDictionaryPageSizeThreshold() {
     return dictionaryPageSizeThreshold;
   }
@@ -168,6 +195,10 @@ public class ParquetProperties {
 
   public boolean isEnableDictionary() {
     return enableDictionary;
+  }
+
+  private ParquetProperties copy() {
+    return new ParquetProperties(writerVersion, pageSizeThreshold, dictionaryPageSizeThreshold, enableDictionary, minRowCountForPageSizeCheck, maxRowCountForPageSizeCheck, estimateNextSizeCheck, allocator, getValuesWriterFactory(), addPageHeadersToMetadata, enableDictionarForBinaryType);
   }
 
   public boolean shouldAddPageHeadersToMetadata() {
@@ -218,6 +249,7 @@ public class ParquetProperties {
     private int pageSize = DEFAULT_PAGE_SIZE;
     private int dictPageSize = DEFAULT_DICTIONARY_PAGE_SIZE;
     private boolean enableDict = DEFAULT_IS_DICTIONARY_ENABLED;
+    private boolean enableDictionarForBinaryType = DEFAULT_IS_DICTIONARY_ENABLED;
     private WriterVersion writerVersion = DEFAULT_WRITER_VERSION;
     private int minRowCountForPageSizeCheck = DEFAULT_MINIMUM_RECORD_COUNT_FOR_CHECK;
     private int maxRowCountForPageSizeCheck = DEFAULT_MAXIMUM_RECORD_COUNT_FOR_CHECK;
@@ -249,6 +281,17 @@ public class ParquetProperties {
       Preconditions.checkArgument(pageSize > 0,
           "Invalid page size (negative): %s", pageSize);
       this.pageSize = pageSize;
+      return this;
+    }
+
+    /**
+     * Enable or disable dictionary encoding for binary type.
+     *
+     * @param enableDictionaryForBinaryType whether dictionary encoding should be enabled for binary type
+     * @return this builder for method chaining.
+     */
+    public Builder withDictionaryEncodingForBinaryType(boolean enableDictionaryForBinaryType) {
+      this.enableDictionarForBinaryType = enableDictionaryForBinaryType;
       return this;
     }
 
@@ -328,7 +371,7 @@ public class ParquetProperties {
       ParquetProperties properties =
         new ParquetProperties(writerVersion, pageSize, dictPageSize,
           enableDict, minRowCountForPageSizeCheck, maxRowCountForPageSizeCheck,
-          estimateNextSizeCheck, allocator, valuesWriterFactory, addPageHeadersToMetadata);
+          estimateNextSizeCheck, allocator, valuesWriterFactory, addPageHeadersToMetadata, enableDictionarForBinaryType);
       // we pass a constructed but uninitialized factory to ParquetProperties above as currently
       // creation of ValuesWriters is invoked from within ParquetProperties. In the future
       // we'd like to decouple that and won't need to pass an object to properties and then pass the
