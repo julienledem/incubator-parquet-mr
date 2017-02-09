@@ -676,7 +676,7 @@ abstract public class Binary implements Comparable<Binary>, Serializable {
     if (array1 == null && buf == null) return 0;
     int min_length = (length1 < length2) ? length1 : length2;
     for (int i = 0; i < min_length; i++) {
-      final int diff = compareByte(buf.get(i + offset2), array1[i + offset1]);
+      final int diff = compareUnsignedByte(buf.get(i + offset2), array1[i + offset1]);
       if (diff != 0) {
         return diff;
       }
@@ -692,7 +692,7 @@ abstract public class Binary implements Comparable<Binary>, Serializable {
     if (buf1 == null && buf2 == null) return 0;
     int min_length = (length1 < length2) ? length1 : length2;
     for (int i = 0; i < min_length; i++) {
-      final int diff = compareByte(buf2.get(i + offset1), buf1.get(i + offset2));
+      final int diff = compareUnsignedByte(buf2.get(i + offset1), buf1.get(i + offset2));
       if (diff != 0) {
         return diff;
       }
@@ -709,7 +709,7 @@ abstract public class Binary implements Comparable<Binary>, Serializable {
     if (array1 == array2 && offset1 == offset2 && length1 == length2) return 0;
     int min_length = (length1 < length2) ? length1 : length2;
     for (int i = 0; i < min_length; i++) {
-      final int diff = compareByte(array2[i + offset2], array1[i + offset1]);
+      final int diff = compareUnsignedByte(array2[i + offset2], array1[i + offset1]);
       if (diff != 0) {
         return diff;
       }
@@ -720,7 +720,7 @@ abstract public class Binary implements Comparable<Binary>, Serializable {
     else { return -1; }
   }
 
-  private static final int compareByte(byte a, byte b) {
+  private static final int compareUnsignedByte(byte a, byte b) {
     final int value1 = a & 0xFF;
     final int value2 = b & 0xFF;
     return value1 - value2;
