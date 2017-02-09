@@ -676,11 +676,9 @@ abstract public class Binary implements Comparable<Binary>, Serializable {
     if (array1 == null && buf == null) return 0;
     int min_length = (length1 < length2) ? length1 : length2;
     for (int i = 0; i < min_length; i++) {
-      if (array1[i + offset1] < buf.get(i + offset2)) {
-        return 1;
-      }
-      if (array1[i + offset1] > buf.get(i + offset2)) {
-        return -1;
+      final int diff = compareByte(buf.get(i + offset2), array1[i + offset1]);
+      if (diff != 0) {
+        return diff;
       }
     }
     // check remainder
@@ -694,11 +692,9 @@ abstract public class Binary implements Comparable<Binary>, Serializable {
     if (buf1 == null && buf2 == null) return 0;
     int min_length = (length1 < length2) ? length1 : length2;
     for (int i = 0; i < min_length; i++) {
-      if (buf1.get(i + offset1) < buf2.get(i + offset2)) {
-        return 1;
-      }
-      if (buf1.get(i + offset1) > buf2.get(i + offset2)) {
-        return -1;
+      final int diff = compareByte(buf2.get(i + offset1), buf1.get(i + offset2));
+      if (diff != 0) {
+        return diff;
       }
     }
     // check remainder
@@ -713,16 +709,20 @@ abstract public class Binary implements Comparable<Binary>, Serializable {
     if (array1 == array2 && offset1 == offset2 && length1 == length2) return 0;
     int min_length = (length1 < length2) ? length1 : length2;
     for (int i = 0; i < min_length; i++) {
-      if (array1[i + offset1] < array2[i + offset2]) {
-        return 1;
-      }
-      if (array1[i + offset1] > array2[i + offset2]) {
-        return -1;
+      final int diff = compareByte(array2[i + offset2], array1[i + offset1]);
+      if (diff != 0) {
+        return diff;
       }
     }
     // check remainder
     if (length1 == length2) { return 0; }
     else if (length1 < length2) { return 1;}
     else { return -1; }
+  }
+
+  private static final int compareByte(byte a, byte b) {
+    final int value1 = a & 0xFF;
+    final int value2 = b & 0xFF;
+    return value1 - value2;
   }
 }
