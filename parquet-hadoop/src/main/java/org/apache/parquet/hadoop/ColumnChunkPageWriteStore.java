@@ -24,6 +24,7 @@ import static org.apache.parquet.column.statistics.Statistics.getStatsBasedOnTyp
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -75,6 +76,7 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
     private long totalValueCount;
     private long bufferedSize;
     private int pageCount;
+    private boolean dictionaryEncoded;
 
     // repetition and definition level encodings are used only for v1 pages and don't change
     private Set<Encoding> rlEncodings = new HashSet<Encoding>();
@@ -82,6 +84,7 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
     private List<Encoding> dataEncodings = new ArrayList<Encoding>();
 
     private List<PageHolder> bufferedPages = new ArrayList<PageHolder>();
+    private List<ByteBuffer> allocatedBuffers = new ArrayList<ByteBuffer>();
 
     private Statistics totalStatistics;
     private ParquetProperties parquetProperties;
@@ -94,7 +97,15 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
       this.parquetProperties = parquetProperties;
       this.buf = new ConcatenatingByteArrayCollector();
       this.totalStatistics = getStatsBasedOnType(this.path.getType());
+      this.dictionaryEncoded = false;
+    }
 
+    // Copy data on to byte buffer created using allocator
+    BytesInput copy(BytesInput data) throws IOException {
+      final ByteBuffer byteBuffer = parquetProperties.getAllocator().allocate((int)data.size());
+      byteBuffer.put(data.toByteArray());
+      allocatedBuffers.add(byteBuffer);
+      return BytesInput.from(byteBuffer, 0, (int)data.size());
     }
 
     @Override
@@ -108,26 +119,39 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
       this.pageCount += 1;
       this.totalStatistics.mergeStatistics(statistics);
       this.bufferedSize += data.size();
-
-      bufferedPages.add(new PageV1Holder(pageCount, path,
-        data, valueCount, statistics, rlEncoding, dlEncoding, valuesEncoding));
+      this.dictionaryEncoded |= valuesEncoding.usesDictionary();
+      // if we have seen dictionary encoded pages previously or current page is dictionary encoded then copy
+      // data bytes otherwise compress data bytes.
+      if (dictionaryEncoded) {
+        bufferedPages.add(new PageV1Holder(pageCount, path,
+          copy(data), valueCount, statistics, rlEncoding, dlEncoding, valuesEncoding, false, data.size()));
+      } else {
+        bufferedPages.add(new PageV1Holder(pageCount, path,
+          copy(compressor.compress(data)), valueCount, statistics, rlEncoding, dlEncoding, valuesEncoding, true, data.size()));
+      }
     }
 
     private PageHeaderWithOffset preparePage(PageV1Holder pageV1Holder, long currentPos) throws IOException {
-      final BytesInput bytes = pageV1Holder.getData();
 
-      long uncompressedSize = bytes.size();
+      final long uncompressedSize = pageV1Holder.getUncompressedDataSize();
       if (uncompressedSize > Integer.MAX_VALUE) {
         throw new ParquetEncodingException(
             "Cannot write page larger than Integer.MAX_VALUE bytes: " +
                 uncompressedSize);
       }
-      BytesInput compressedBytes = compressor.compress(bytes);
-      long compressedSize = compressedBytes.size();
-      if (compressedSize > Integer.MAX_VALUE) {
-        throw new ParquetEncodingException(
+      final BytesInput compressedBytes;
+      final long compressedSize;
+      if (!pageV1Holder.isCompressed()) {
+        compressedBytes = compressor.compress(pageV1Holder.getData());
+        compressedSize = compressedBytes.size();
+        if (compressedSize > Integer.MAX_VALUE) {
+          throw new ParquetEncodingException(
             "Cannot write compressed page larger than Integer.MAX_VALUE bytes: "
-                + compressedSize);
+              + compressedSize);
+        }
+      } else {
+        compressedBytes = pageV1Holder.getData();
+        compressedSize = compressedBytes.size();
       }
       tempOutputStream.reset();
       final PageHeader pageHeader = parquetMetadataConverter.writeAndReturnDataPageHeader(
@@ -162,22 +186,34 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
       int totalSize = toIntWithCheck(
         data.size() + repetitionLevels.size() + definitionLevels.size());
       this.bufferedSize += totalSize;
-      bufferedPages.add(new PageV2Holder(pageCount, path,
-        rowCount, nullCount, valueCount, repetitionLevels, definitionLevels, dataEncoding, data, statistics));
+      this.dictionaryEncoded |= dataEncoding.usesDictionary();
+      if (dictionaryEncoded) {
+        bufferedPages.add(new PageV2Holder(pageCount, path,
+          rowCount, nullCount, valueCount, repetitionLevels, definitionLevels, dataEncoding, copy(data),
+          statistics, false, data.size()));
+      } else {
+        bufferedPages.add(new PageV2Holder(pageCount, path,
+          rowCount, nullCount, valueCount, repetitionLevels, definitionLevels, dataEncoding,
+          copy(compressor.compress(data)),
+          statistics, true, data.size()));
+      }
     }
 
     private PageHeaderWithOffset preparePage(PageV2Holder pageV2Holder, long currentPos) throws IOException {
       final BytesInput repetitionLevels = pageV2Holder.getRepetitionLevels();
       final BytesInput definitionLevels = pageV2Holder.getDefinitionLevels();
-      final BytesInput data = pageV2Holder.getData();
 
       int rlByteLength = toIntWithCheck(repetitionLevels.size());
       int dlByteLength = toIntWithCheck(definitionLevels.size());
       int uncompressedSize = toIntWithCheck(
-          data.size() + repetitionLevels.size() + definitionLevels.size()
+          pageV2Holder.getUncompressedDataSize() + repetitionLevels.size() + definitionLevels.size()
       );
-      // TODO: decide if we compress
-      BytesInput compressedData = compressor.compress(data);
+      final BytesInput compressedData;
+      if (pageV2Holder.isCompressed()) {
+        compressedData = pageV2Holder.getData();
+      } else {
+        compressedData = compressor.compress(pageV2Holder.getData());
+      }
       int compressedSize = toIntWithCheck(
           compressedData.size() + repetitionLevels.size() + definitionLevels.size()
       );
@@ -264,6 +300,9 @@ class ColumnChunkPageWriteStore implements PageWriteStore {
             ", dic { %,d entries, %,dB raw, %,dB comp}",
             dictionaryPage.getDictionarySize(), dictionaryPage.getUncompressedSize(), dictionaryPage.getDictionarySize())
             : ""));
+      }
+      for (ByteBuffer buffer:  allocatedBuffers) {
+        parquetProperties.getAllocator().release(buffer);
       }
       rlEncodings.clear();
       dlEncodings.clear();

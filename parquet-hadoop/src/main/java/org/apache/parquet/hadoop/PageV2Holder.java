@@ -34,9 +34,11 @@ public class PageV2Holder extends PageHolder {
   private final BytesInput repetitionLevels;
   private final BytesInput definitionLevels;
 
-  public PageV2Holder(int pageIndex, ColumnDescriptor path, int rowCount, int nullCount, int valueCount, BytesInput repetitionLevels, BytesInput definitionLevels, Encoding dataEncoding, BytesInput data, Statistics<?> statistics)
+  public PageV2Holder(int pageIndex, ColumnDescriptor path, int rowCount, int nullCount, int valueCount,
+                      BytesInput repetitionLevels, BytesInput definitionLevels, Encoding dataEncoding, BytesInput data,
+                      Statistics<?> statistics, boolean compressed, long uncompressedDataSize)
     throws IOException{
-    super(pageIndex, PageType.V2, path, data, valueCount, dataEncoding, statistics);
+    super(pageIndex, PageType.V2, path, data, valueCount, dataEncoding, statistics, compressed, uncompressedDataSize);
     this.rowCount = rowCount;
     this.nullCount = nullCount;
     this.repetitionLevels = BytesInput.copy(repetitionLevels);

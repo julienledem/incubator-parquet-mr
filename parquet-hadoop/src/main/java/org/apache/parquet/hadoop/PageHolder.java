@@ -36,24 +36,31 @@ public abstract class PageHolder {
   private BytesInput data;
   private final Statistics statistics;
   private final PageType type;
+  private boolean compressed;
+  private long uncompressedDataSize;
 
   enum PageType {
     V1,
     V2
   }
 
-  public PageHolder(int pageIndex, PageType type, ColumnDescriptor path, BytesInput data, int valueCount, Encoding valuesEncoding, Statistics statistics) throws IOException {
+  public PageHolder(int pageIndex, PageType type, ColumnDescriptor path, BytesInput data, int valueCount,
+                    Encoding valuesEncoding, Statistics statistics, boolean compressed, long uncompressedDataSize) throws IOException {
     this.pageIndex = pageIndex;
     this.path = path;
     this.statistics = statistics;
     this.valueCount = valueCount;
     this.valuesEncoding = valuesEncoding;
-    this.data = BytesInput.copy(data);
+    this.data = data;
     this.type = type;
+    this.uncompressedDataSize = uncompressedDataSize;
+    this.compressed = compressed;
   }
 
   public void setData(BytesInput data) {
     this.data = data;
+    this.uncompressedDataSize = data.size();
+    this.compressed = false;
   }
 
   public void setValuesEncoding(Encoding valuesEncoding) {
@@ -82,6 +89,14 @@ public abstract class PageHolder {
 
   public Encoding getValuesEncoding() {
     return valuesEncoding;
+  }
+
+  public boolean isCompressed() {
+    return compressed;
+  }
+
+  public long getUncompressedDataSize() {
+    return uncompressedDataSize;
   }
 
   public ColumnDescriptor getPath() {

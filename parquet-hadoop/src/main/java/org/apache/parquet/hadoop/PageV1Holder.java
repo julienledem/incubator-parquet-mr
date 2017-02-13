@@ -18,7 +18,6 @@
  */
 package org.apache.parquet.hadoop;
 
-import static org.apache.parquet.Log.DEBUG;
 import static org.apache.parquet.column.ValuesType.DEFINITION_LEVEL;
 import static org.apache.parquet.column.ValuesType.REPETITION_LEVEL;
 
@@ -40,8 +39,8 @@ public class PageV1Holder extends PageHolder {
   private final Encoding dlEncoding;
 
   public PageV1Holder(int pageIndex, ColumnDescriptor path, BytesInput bytes, int valueCount, Statistics statistics,
-                      Encoding rlEncoding, Encoding dlEncoding, Encoding valuesEncoding) throws IOException {
-    super(pageIndex, PageType.V1, path, bytes, valueCount, valuesEncoding, statistics);
+                      Encoding rlEncoding, Encoding dlEncoding, Encoding valuesEncoding, boolean compressed, long uncompressedDataSize) throws IOException {
+    super(pageIndex, PageType.V1, path, bytes, valueCount, valuesEncoding, statistics, compressed, uncompressedDataSize);
     this.rlEncoding = rlEncoding;
     this.dlEncoding = dlEncoding;
   }
