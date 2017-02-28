@@ -1,4 +1,4 @@
-/* 
+/*
  * Licensed to the Apache Software Foundation (ASF) under one
  * or more contributor license agreements.  See the NOTICE file
  * distributed with this work for additional information
@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- * 
+ *
  *   http://www.apache.org/licenses/LICENSE-2.0
- * 
+ *
  * Unless required by applicable law or agreed to in writing,
  * software distributed under the License is distributed on an
  * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
@@ -23,11 +23,11 @@ import java.io.DataInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.util.Arrays;
-import java.util.List;
 import java.nio.ByteBuffer;
 import java.nio.channels.Channels;
 import java.nio.channels.WritableByteChannel;
+import java.util.Arrays;
+import java.util.List;
 
 import org.apache.parquet.Log;
 
@@ -74,7 +74,16 @@ abstract public class BytesInput {
   public static BytesInput from(InputStream in, int bytes) {
     return new StreamBytesInput(in, bytes);
   }
-  
+
+  /**
+   * same as calling {@link BytesInput#from(ByteBuffer, int, int)} with (buffer, buffer.position(), buffer.remaining())
+   * @param buffer
+   * @return
+   */
+  public static BytesInput from(ByteBuffer buffer) {
+    return from(buffer, buffer.position(), buffer.remaining());
+  }
+
   /**
    * @param buffer
    * @param length number of bytes to read
@@ -180,6 +189,15 @@ abstract public class BytesInput {
    * @throws IOException
    */
   abstract public void writeAllTo(OutputStream out) throws IOException;
+
+  /**
+   * writes the bytes into a buffer
+   * @param out
+   * @throws IOException
+   */
+  public void writeAllTo(ByteBuffer out) throws IOException {
+    out.put(toByteArray());
+  }
 
   /**
    *
@@ -446,9 +464,9 @@ abstract public class BytesInput {
     }
 
   }
-  
+
   private static class ByteBufferBytesInput extends BytesInput {
-    
+
     private final ByteBuffer byteBuf;
     private final int length;
     private final int offset;
@@ -459,20 +477,27 @@ abstract public class BytesInput {
       this.length = length;
     }
 
-    @Override
-    public void writeAllTo(OutputStream out) throws IOException {
-      final WritableByteChannel outputChannel = Channels.newChannel(out);
+    private ByteBuffer slice() {
       byteBuf.position(offset);
       ByteBuffer tempBuf = byteBuf.slice();
       tempBuf.limit(length);
-      outputChannel.write(tempBuf);
+      return tempBuf;
     }
-    
+
+    @Override
+    public void writeAllTo(OutputStream out) throws IOException {
+      final WritableByteChannel outputChannel = Channels.newChannel(out);
+      outputChannel.write(slice());
+    }
+
+    @Override
+    public void writeAllTo(ByteBuffer out) throws IOException {
+      out.put(slice());
+    }
+
     @Override
     public ByteBuffer toByteBuffer() throws IOException {
-      byteBuf.position(offset);
-      ByteBuffer buf = byteBuf.slice();
-      buf.limit(length);
+      ByteBuffer buf = slice();
       return buf;
     }
 

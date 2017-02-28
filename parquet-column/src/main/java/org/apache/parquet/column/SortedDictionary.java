@@ -53,7 +53,6 @@ public class SortedDictionary {
       // map old dictionary id to new one
       sortedDictionaryId.put(indices[i], i);
     }
-
     // Create sorted dictionary page.
     final DictionaryValuesWriter dictionaryValuesWriter = parquetProperties.newDictionaryWriter(columnDescriptor);
     try {

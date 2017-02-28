@@ -18,13 +18,14 @@
  */
 package org.apache.parquet.bytes;
 
+import static java.lang.String.format;
+
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 
-import static java.lang.String.format;
-
+@Deprecated
 public class ConcatenatingByteArrayCollector extends BytesInput {
   private final List<byte[]> slabs = new ArrayList<byte[]>();
   private long size = 0;

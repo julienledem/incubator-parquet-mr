@@ -24,44 +24,91 @@ import static org.apache.parquet.column.ValuesType.REPETITION_LEVEL;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import org.apache.parquet.bytes.ByteBufferAllocator;
 import org.apache.parquet.bytes.BytesInput;
 import org.apache.parquet.column.ColumnDescriptor;
 import org.apache.parquet.column.Encoding;
 import org.apache.parquet.column.statistics.Statistics;
 import org.apache.parquet.column.values.ValuesReader;
+import org.apache.parquet.hadoop.CodecFactory.BytesCompressor;
 
 /**
  * Page (v1) holder that holds on to page data and encoding etc.
  */
-public class PageV1Holder extends PageHolder {
+class PageV1Holder extends PageHolder {
 
   private final Encoding rlEncoding;
   private final Encoding dlEncoding;
+  private ByteBuffer pageBody; // includes RLs, DLs, Values. position = 0 and limit = size
+  private long uncompressedPageBodySize;
 
-  public PageV1Holder(int pageIndex, ColumnDescriptor path, BytesInput bytes, int valueCount, Statistics statistics,
-                      Encoding rlEncoding, Encoding dlEncoding, Encoding valuesEncoding, boolean compressed, long uncompressedDataSize) throws IOException {
-    super(pageIndex, PageType.V1, path, bytes, valueCount, valuesEncoding, statistics, compressed, uncompressedDataSize);
+  PageV1Holder(ByteBufferAllocator allocator, BytesCompressor compressor, int pageIndex, ColumnDescriptor path, BytesInput bytes, int valueCount, Statistics<?> statistics,
+                      Encoding rlEncoding, Encoding dlEncoding, Encoding valuesEncoding, boolean compressed, long uncompressedPageBodySize) throws IOException {
+    super(allocator, compressor, pageIndex, PageType.V1, path, valueCount, valuesEncoding, statistics, compressed);
+    this.pageBody = copy(bytes);
+    this.uncompressedPageBodySize = uncompressedPageBodySize;
     this.rlEncoding = rlEncoding;
     this.dlEncoding = dlEncoding;
   }
 
-  public Encoding getRlEncoding() {
+  Encoding getRlEncoding() {
     return rlEncoding;
   }
 
-  public Encoding getDlEncoding() {
+  Encoding getDlEncoding() {
     return dlEncoding;
   }
 
+  long getUncompressedPageBodySize() {
+    return uncompressedPageBodySize;
+  }
+
+  ByteBuffer getPageBody() {
+    return pageBody;
+  }
+
   @Override
-  public int getDataOffset() throws IOException {
+  int getDataOffset() throws IOException {
     final ValuesReader rlReader = rlEncoding.getValuesReader(getPath(), REPETITION_LEVEL);
     final ValuesReader dlReader = dlEncoding.getValuesReader(getPath(), DEFINITION_LEVEL);
-    final ByteBuffer bytes = getData().toByteBuffer();
-    rlReader.initFromPage(getValueCount(), bytes, 0);
+    rlReader.initFromPage(getValueCount(), pageBody, 0);
     int next = rlReader.getNextOffset();
-    dlReader.initFromPage(getValueCount(), bytes, next);
+    dlReader.initFromPage(getValueCount(), pageBody, next);
     next = dlReader.getNextOffset();
     return next;
   }
+
+  @Override
+  void updateData(BytesInput valuesBytes, Encoding encoding) throws IOException {
+    final BytesInput rldlBytes = BytesInput.from(pageBody, 0, getDataOffset());
+    BytesInput uncompressedData = BytesInput.concat(rldlBytes, valuesBytes);
+    this.uncompressedPageBodySize = uncompressedData.size();
+    this.pageBody = compressFirstToReplaceSecond(uncompressedData, this.pageBody);
+    this.compressed = true;
+    this.valuesEncoding = encoding;
+  }
+
+  @Override
+  void compressIfNeeded() throws IOException {
+    if (isCompressed()) {
+      return;
+    }
+    this.pageBody = compressFirstToReplaceSecond(BytesInput.from(this.pageBody, 0, (int)uncompressedPageBodySize), this.pageBody);
+    this.compressed = true;
+    this.valuesEncoding = getValuesEncoding();
+  }
+
+  @Override
+  public ByteBuffer getValuesBytes() throws IOException {
+    int dataOffset = getDataOffset();
+    ByteBuffer b = pageBody.slice();
+    b.position(dataOffset);
+    return b;
+  }
+
+  @Override
+  public void release() {
+    release(pageBody);
+  }
+
 }
