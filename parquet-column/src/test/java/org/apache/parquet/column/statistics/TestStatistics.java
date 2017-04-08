@@ -22,6 +22,7 @@ import static org.junit.Assert.*;
 
 import java.nio.ByteBuffer;
 
+import org.apache.parquet.bytes.DirectByteBufferAllocator;
 import org.junit.Test;
 
 import org.apache.parquet.io.api.Binary;
@@ -583,5 +584,25 @@ public class TestStatistics {
 
     assertEquals(stats.getMax(), Binary.fromString("zzzz"));
     assertEquals(stats.getMin(), Binary.fromString(""));
+  }
+
+  @Test
+  public void testBinaryStats() {
+    DirectByteBufferAllocator directByteBufferAllocator = new DirectByteBufferAllocator();
+    Binary empty = Binary.fromReusedByteBuffer(directByteBufferAllocator.allocate(0).asReadOnlyBuffer(), 0, 0);
+    Binary max = Binary.fromString("zzz");
+    assertTrue(max.compareTo(empty) > 0);
+
+    Binary min = Binary.fromString("aaa");
+    Binary median = Binary.fromReusedByteBuffer(directByteBufferAllocator.allocate(1).put((byte)'b').asReadOnlyBuffer(), 0, 1);
+
+    BinaryStatistics statistics = new BinaryStatistics();
+    statistics.updateStats(median);
+    statistics.updateStats(min);
+    statistics.updateStats(max);
+    statistics.updateStats(empty);
+
+    assertEquals(empty, statistics.getMin());
+    assertEquals(max, statistics.getMax());
   }
 }
