@@ -50,7 +50,7 @@ public class CorruptStatistics {
    */
   public static boolean shouldIgnoreStatistics(String createdBy, PrimitiveTypeName columnType) {
 
-    if (columnType != PrimitiveTypeName.BINARY && columnType != PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY) {
+    if (columnType != PrimitiveTypeName.BINARY && columnType != PrimitiveTypeName.FIXED_LEN_BYTE_ARRAY && columnType != PrimitiveTypeName.INT96) {
       // the bug only applies to binary columns
       return false;
     }
